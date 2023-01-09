@@ -109,7 +109,7 @@ int JoNES::coreExec(uint8_t opcode)
 	case 0x60: break;
 	case 0x61: break;
 	
-	case 0x65: // ADC 0 page
+	case 0x65: // ADC zero-page
 		// get addr then increase PC
 		uint8_t addr = this->memory[this->PC++];
 		uint8_t res = this->memory[addr];
