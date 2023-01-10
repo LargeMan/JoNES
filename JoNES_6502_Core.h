@@ -91,5 +91,6 @@ private:
 			return i & 0x2007;
 		return i;
 	}
-	int adc(uint16_t val);
+
+	int adc(uint16_t i);
 };

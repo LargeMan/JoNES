@@ -113,7 +113,6 @@ int JoNES::coreExec(uint8_t opcode)
 		// get addr then increase PC
 		uint8_t addr = this->memory[this->PC++];
 		uint8_t res = this->memory[addr];
-		res += this->accum;
 
 		this->adc(res);
 		break;
@@ -124,7 +123,6 @@ int JoNES::coreExec(uint8_t opcode)
 	case 0x69: // ADC Immediate
 		// get byte then increase PC
 		uint16_t imm = this->memory[this->PC++];
-		imm += this->accum;
 
 		this->adc(imm);
 		break;
@@ -132,19 +130,44 @@ int JoNES::coreExec(uint8_t opcode)
 	case 0x6A: break;
 	
 	case 0x6C: break;
-	case 0x6D: break;
+	case 0x6D: // ADC absolute
+		// 6502 is little endian (lower byte first)
+		uint16_t addr = this->memory[this->PC++];
+		addr |= this->memory[this->PC++] << 8;
+		// note: pc updated twice since two bytes accessed
+		this->adc(this->memory[addr]);
+		break;
 	case 0x6E: break;
 	
 	case 0x70: break;
 	case 0x71: break;
 	
-	case 0x75: break;
+	case 0x75: // ADC Zero-page, X
+		// get addr then increase PC
+		uint16_t addr = this->memory[this->PC++] + this->memory[this->x_reg];
+		uint16_t res = this->memory[addr & 0xFF]; // if addr overflows, wrap around
+
+
+		this->adc(res);
+		break;
 	case 0x76: break;
 
 	case 0x78: break;
-	case 0x79: break;
+	case 0x79: // ADC absolute, Y
+		uint32_t addr = this->memory[this->PC++];
+		addr |= this->memory[this->PC++] << 8;
+		addr += this->memory[this->y_reg];
+		// account for potential addr overflow
+		this->adc((uint16_t)(addr & 0xFFFF));
+		break;
 	
-	case 0x7D: break;
+	case 0x7D: // ADC absolute, X
+		uint32_t addr = this->memory[this->PC++];
+		addr |= this->memory[this->PC++] << 8;
+		addr += this->memory[this->x_reg];
+		// account for potential addr overflow
+		this->adc((uint16_t)(addr & 0xFFFF));
+		break;
 	case 0x7E: break;
 
 	case 0x81: break;
@@ -316,12 +339,22 @@ int JoNES::runCore(bool debug=false)
 	return 1;
 }
 
-int JoNES::adc(uint16_t val)
+int JoNES::adc(uint16_t i)
 {
+	uint16_t val = i + this->accum;
 	// deal with flags; check for carry
 	this->status |= (val & 0x80); // set N flag
+
 	if (val > 0xFF)
 		this->status |= 1; // set C  flag
+
+	//http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html
+	if ((i ^ val) & (this->accum ^ val) & 0x80)
+		this->status |= 0x40;
+
 	this->accum = (uint8_t)(val & 0xFF); // update A
+
+	if (this->accum == 0)
+		this->status |= 2; // 0b10
 }
 
