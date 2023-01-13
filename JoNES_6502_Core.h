@@ -73,12 +73,15 @@ private:
 	uint8_t memory[65536] = { 0 };
 
 	// registers
-	uint8_t status = 0x34; //011100 
+	uint8_t status = 0x34; //011100; 
 	uint8_t stack_ptr = 0xFD;
 	uint8_t x_reg = 0;
 	uint8_t y_reg = 0;
 	uint8_t accum = 0;
 	uint16_t PC = 0;
+
+	// flags
+	int flag_N, flag_V, flag_B, flag_D, flag_I, flag_Z, flag_C;
 
 
 	int indexTrans(int i)
@@ -91,6 +94,13 @@ private:
 			return i & 0x2007;
 		return i;
 	}
+	// addressing methods
+	uint16_t absolute(uint8_t val);
+	uint16_t zero_page(uint8_t val);
+	uint16_t index_indirect_x();
+	uint16_t indirect_index_y();
 
+	// function methods
 	int adc(uint16_t i);
+	int lda(uint8_t val);
 };

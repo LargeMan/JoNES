@@ -107,66 +107,46 @@ int JoNES::coreExec(uint8_t opcode)
 	case 0x5E: break;
 
 	case 0x60: break;
-	case 0x61: break;
+	case 0x61: // ADC (Indirect, X)
+		this->adc(this->index_indirect_x());
+		break;
 	
 	case 0x65: // ADC zero-page
-		// get addr then increase PC
-		uint8_t addr = this->memory[this->PC++];
-		uint8_t res = this->memory[addr];
-
-		this->adc(res);
+		this->adc(this->zero_page());
 		break;
 
 	case 0x66: break;
 	
 	case 0x68: break;
 	case 0x69: // ADC Immediate
-		// get byte then increase PC
-		uint16_t imm = this->memory[this->PC++];
-
-		this->adc(imm);
+		this->adc(this->memory[this->PC++]);
 		break;
 
 	case 0x6A: break;
 	
 	case 0x6C: break;
 	case 0x6D: // ADC absolute
-		// 6502 is little endian (lower byte first)
-		uint16_t addr = this->memory[this->PC++];
-		addr |= this->memory[this->PC++] << 8;
-		// note: pc updated twice since two bytes accessed
-		this->adc(this->memory[addr]);
+		this->adc(this->absolute());
 		break;
 	case 0x6E: break;
 	
 	case 0x70: break;
-	case 0x71: break;
+	case 0x71: // ADC (Indirect), Y
+		this->adc(this->indirect_index_y());
+		break;
 	
 	case 0x75: // ADC Zero-page, X
-		// get addr then increase PC
-		uint16_t addr = this->memory[this->PC++] + this->memory[this->x_reg];
-		uint16_t res = this->memory[addr & 0xFF]; // if addr overflows, wrap around
-
-
-		this->adc(res);
+		this->adc(this->zero_page(this->memory[this->x_reg]));
 		break;
 	case 0x76: break;
 
 	case 0x78: break;
 	case 0x79: // ADC absolute, Y
-		uint32_t addr = this->memory[this->PC++];
-		addr |= this->memory[this->PC++] << 8;
-		addr += this->memory[this->y_reg];
-		// account for potential addr overflow
-		this->adc((uint16_t)(addr & 0xFFFF));
+		this->adc(this->absolute(this->memory[this->y_reg]));
 		break;
 	
 	case 0x7D: // ADC absolute, X
-		uint32_t addr = this->memory[this->PC++];
-		addr |= this->memory[this->PC++] << 8;
-		addr += this->memory[this->x_reg];
-		// account for potential addr overflow
-		this->adc((uint16_t)(addr & 0xFFFF));
+		this->adc(this->absolute(this->memory[this->x_reg]));
 		break;
 	case 0x7E: break;
 
@@ -198,34 +178,50 @@ int JoNES::coreExec(uint8_t opcode)
 	case 0x9D: break;
 
 	case 0xA0: break;
-	case 0xA1: break;
+	case 0xA1: // LDA (Indirect, X)
+		this->lda(this->index_indirect_x());
+		break;
 	case 0xA2: break;
 
 	case 0xA4: break;
-	case 0xA5: break;
+	case 0xA5:// LDA Zero Page
+		this->lda(this->zero_page());
+		break;
 	case 0xA6: break;
 
 	case 0xA8: break;
-	case 0xA9: break;
+	case 0xA9: // LDA Immediate
+		this->lda(this->memory[this->PC++]);
+		break;
 	case 0xAA: break;
 
 	case 0xAC: break;
-	case 0xAD: break;
+	case 0xAD: // LDA Absolute
+		this->lda(this->absolute());
+		break;
 	case 0xAE: break;
 
 	case 0xB0: break;
-	case 0xB1: break;
+	case 0xB1: // LDA (Indirect), Y
+		this->lda(this->indirect_index_y());
+		break;
 
 	case 0xB4: break;
-	case 0xB5: break;
+	case 0xB5: // LDA Zero Page, X
+		this->lda(this->zero_page(this->memory[this->x_reg]));
+		break;
 	case 0xB6: break;
 
 	case 0xB8: break;
-	case 0xB9: break;
+	case 0xB9: // LDA Absolute, Y
+		this->lda(this->absolute(this->memory[this->y_reg]));
+		break;
 	case 0xBA: break;
 
 	case 0xBC: break;
-	case 0xBD: break;
+	case 0xBD: // LDA Absolute, X
+		this->lda(this->absolute(this->memory[this->x_reg]));
+		break;
 	case 0xBE: break;
 
 	case 0xC0: break;
@@ -339,22 +335,82 @@ int JoNES::runCore(bool debug=false)
 	return 1;
 }
 
+// =============== Indexing Modes ==============
+
+
+
+// pass mem[x] or mem[y] reg to this
+uint16_t JoNES::absolute(uint8_t val=0)
+{
+	uint32_t addr = this->memory[this->PC++];
+	addr |= this->memory[this->PC++] << 8;
+	addr += val;
+
+	return (uint16_t)(addr & 0xFFFF);
+}
+// pass mem[x] or mem[y]  to this
+uint16_t JoNES::zero_page(uint8_t val=0)
+{
+	// get addr, increase PC, then add value at addr w/ X val
+	uint16_t addr = this->memory[this->PC++] + val;
+	uint16_t res = this->memory[addr & 0xFF]; // if addr overflows, wrap around
+	return res;
+}
+
+uint16_t JoNES::index_indirect_x()
+{
+	// get addr and add X val to it (ensure wrap around)
+	uint16_t addr = this->memory[this->PC++] + this->memory[this->x_reg];
+	addr &= 0xFF; // eliminate any carry
+
+	// load LSB
+	uint16_t res = this->memory[addr];
+	// load MSB
+	res |= this->memory[(addr + 1) & 0xFF] << 8;
+
+	return this->memory[res];
+}
+
+uint16_t JoNES::indirect_index_y()
+{
+	// get addr, add to Y val
+	uint8_t param = this->memory[this->PC++];
+	uint16_t addr = this->memory[param] + this->memory[this->y_reg];
+	// addr is LSB; MSB will be bit 9 (carry) + 1 + LSB
+	addr |= this->memory[(param + 1) && 0xFF] + (addr >> 8);
+
+	return this->memory[addr];
+}
+
+
+// =============== Functions ==============
 int JoNES::adc(uint16_t i)
 {
 	uint16_t val = i + this->accum;
 	// deal with flags; check for carry
-	this->status |= (val & 0x80); // set N flag
-
+	//this->status |= (val & 0x80); // set N flag
+	this->flag_N = (val & 0x80) >> 7;
 	if (val > 0xFF)
-		this->status |= 1; // set C  flag
+		this->flag_C = 1; // set C  flag
 
 	//http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html
 	if ((i ^ val) & (this->accum ^ val) & 0x80)
-		this->status |= 0x40;
+		this->flag_V = 1;
 
 	this->accum = (uint8_t)(val & 0xFF); // update A
 
 	if (this->accum == 0)
-		this->status |= 2; // 0b10
+		this->flag_Z = 1;
+
+	return 1; // success
+}
+
+int JoNES::lda(uint8_t val)
+{
+	this->accum = val;
+	this->flag_N = (val & 0x80) >> 7;
+	if (val == 0) this->flag_Z = 1;
+
+	return 1; // success
 }
 
