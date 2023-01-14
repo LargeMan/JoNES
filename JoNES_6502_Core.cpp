@@ -43,22 +43,28 @@ int JoNES::coreExec(uint8_t opcode)
 		break;
 
 	case 0x0D: break;
-	case 0x0E: break;
+	case 0x0E: // ASL Absolute
+		this->ASL(this->absolute());
+		break;
 
 	case 0x10: break;
 	case 0x11: break;
 
 	case 0x15: break;
-	case 0x16: break;
+	case 0x16: // ASL Zero Page, X
+		this->ASL(this->zero_page(this->getX()));
+		break;
 
 	case 0x18: break;
 	case 0x19: break;
 
 	case 0x1D: break;
-	case 0x1E: break;
+	case 0x1E: // ASL Absolute, X
+		this->ASL(this->absolute(this->getX()));
+		break;
 
 	case 0x20: break;
-	case 0x21:
+	case 0x21: // AND (Indirect, X)
 		this->AND(this->index_indirect_x());
 		break;
 
@@ -81,7 +87,7 @@ int JoNES::coreExec(uint8_t opcode)
 	case 0x2E: break;
 
 	case 0x30: break;
-	case 0x31:
+	case 0x31: // AND (Indirect), Y
 		this->AND(this->indirect_index_y());
 		break;
 
@@ -370,13 +376,13 @@ int JoNES::runCore(bool debug=false)
 
 
 // pass mem[x] or mem[y] reg to this
-uint8_t JoNES::absolute(uint8_t val=0)
+uint8_t& JoNES::absolute(uint8_t val=0)
 {
 	uint32_t addr = this->memory[this->PC++];
 	addr |= this->memory[this->PC++] << 8;
 	addr += val;
 
-	return (uint16_t)(addr & 0xFFFF);
+	return this->memory[(uint16_t)(addr & 0xFFFF)];
 }
 // pass mem[x] or mem[y]  to this
 uint8_t& JoNES::zero_page(uint8_t val=0)

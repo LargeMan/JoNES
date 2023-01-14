@@ -104,7 +104,7 @@ private:
 		return memory[y_reg];
 	}
 	// addressing methods
-	uint8_t absolute(uint8_t val);
+	uint8_t &absolute(uint8_t val);
 	uint8_t &zero_page(uint8_t val);
 	uint8_t &index_indirect_x();
 	uint8_t &indirect_index_y();
