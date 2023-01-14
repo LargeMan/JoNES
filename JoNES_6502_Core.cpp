@@ -32,11 +32,15 @@ int JoNES::coreExec(uint8_t opcode)
 	case 0x01: break;
 
 	case 0x05: break;
-	case 0x06: break;
+	case 0x06: // ASL Zero Page
+		this->ASL(this->zero_page());
+		break;
 
 	case 0x08: break;
 	case 0x09: break;
-	case 0x0A: break;
+	case 0x0A: // ASL Accumulator
+		this->ASL(this->accum);
+		break;
 
 	case 0x0D: break;
 	case 0x0E: break;
@@ -54,30 +58,46 @@ int JoNES::coreExec(uint8_t opcode)
 	case 0x1E: break;
 
 	case 0x20: break;
-	case 0x21: break;
+	case 0x21:
+		this->AND(this->index_indirect_x());
+		break;
 
 	case 0x24: break;
-	case 0x25: break;
+	case 0x25: // AND Zero Page
+		this->AND(this->zero_page());
+		break;
 	case 0x26: break;
 
 	case 0x28: break;
-	case 0x29: break;
+	case 0x29: // AND Immediate
+		this->AND(this->memory[this->PC++]);
+		break;
 	case 0x2A: break;
 
 	case 0x2C: break;
-	case 0x2D: break;
+	case 0x2D: // AND Absolute
+		this->AND(this->absolute());
+		break;
 	case 0x2E: break;
 
 	case 0x30: break;
-	case 0x31: break;
+	case 0x31:
+		this->AND(this->indirect_index_y());
+		break;
 
-	case 0x35: break;
+	case 0x35: // AND Zero Page, X
+		this->AND(this->zero_page(this->getX()));
+		break;
 	case 0x36: break;
 
 	case 0x38: break;
-	case 0x39: break;
+	case 0x39: // AND Absolute, Y
+		this->AND(this->absolute(this->getY()));
+		break;
 
-	case 0x3D: break;
+	case 0x3D: // AND Absolute, X
+		this->AND(this->absolute(this->getX()));
+		break;
 	case 0x3E: break;
 
 	case 0x40: break;
@@ -108,45 +128,45 @@ int JoNES::coreExec(uint8_t opcode)
 
 	case 0x60: break;
 	case 0x61: // ADC (Indirect, X)
-		this->adc(this->index_indirect_x());
+		this->ADC(this->index_indirect_x());
 		break;
 	
 	case 0x65: // ADC zero-page
-		this->adc(this->zero_page());
+		this->ADC(this->zero_page());
 		break;
 
 	case 0x66: break;
 	
 	case 0x68: break;
 	case 0x69: // ADC Immediate
-		this->adc(this->memory[this->PC++]);
+		this->ADC(this->memory[this->PC++]);
 		break;
 
 	case 0x6A: break;
 	
 	case 0x6C: break;
 	case 0x6D: // ADC absolute
-		this->adc(this->absolute());
+		this->ADC(this->absolute());
 		break;
 	case 0x6E: break;
 	
 	case 0x70: break;
 	case 0x71: // ADC (Indirect), Y
-		this->adc(this->indirect_index_y());
+		this->ADC(this->indirect_index_y());
 		break;
 	
 	case 0x75: // ADC Zero-page, X
-		this->adc(this->zero_page(this->memory[this->x_reg]));
+		this->ADC(this->zero_page(this->getX()));
 		break;
 	case 0x76: break;
 
 	case 0x78: break;
 	case 0x79: // ADC absolute, Y
-		this->adc(this->absolute(this->memory[this->y_reg]));
+		this->ADC(this->absolute(this->getY()));
 		break;
 	
 	case 0x7D: // ADC absolute, X
-		this->adc(this->absolute(this->memory[this->x_reg]));
+		this->ADC(this->absolute(this->getX()));
 		break;
 	case 0x7E: break;
 
@@ -179,50 +199,60 @@ int JoNES::coreExec(uint8_t opcode)
 
 	case 0xA0: break;
 	case 0xA1: // LDA (Indirect, X)
-		this->lda(this->index_indirect_x());
+		this->LD(this->accum, this->index_indirect_x());
 		break;
-	case 0xA2: break;
+	case 0xA2: // LDX Immediate
+		this->LD(this->x_reg, this->memory[this->PC++]);
+		break;
 
 	case 0xA4: break;
-	case 0xA5:// LDA Zero Page
-		this->lda(this->zero_page());
+	case 0xA5: // LDA Zero Page
+		this->LD(this->accum, this->zero_page());
 		break;
-	case 0xA6: break;
+	case 0xA6: // LDX Zero Page
+		this->LD(this->x_reg, this->zero_page());
+		break;
 
 	case 0xA8: break;
 	case 0xA9: // LDA Immediate
-		this->lda(this->memory[this->PC++]);
+		this->LD(this->accum, this->memory[this->PC++]);
 		break;
 	case 0xAA: break;
 
 	case 0xAC: break;
 	case 0xAD: // LDA Absolute
-		this->lda(this->absolute());
+		this->LD(this->accum, this->absolute());
 		break;
-	case 0xAE: break;
+	case 0xAE: // LDX Absolute
+		this->LD(this->x_reg, this->absolute());
+		break;
 
 	case 0xB0: break;
 	case 0xB1: // LDA (Indirect), Y
-		this->lda(this->indirect_index_y());
+		this->LD(this->accum, this->indirect_index_y());
 		break;
 
 	case 0xB4: break;
 	case 0xB5: // LDA Zero Page, X
-		this->lda(this->zero_page(this->memory[this->x_reg]));
+		this->LD(this->accum, this->zero_page(this->getX()));
 		break;
-	case 0xB6: break;
+	case 0xB6: // LDX Zero Page, Y
+		this->LD(this->x_reg, this->zero_page(this->getY()));
+		break;
 
 	case 0xB8: break;
 	case 0xB9: // LDA Absolute, Y
-		this->lda(this->absolute(this->memory[this->y_reg]));
+		this->LD(this->accum, this->absolute(this->getY()));
 		break;
 	case 0xBA: break;
 
 	case 0xBC: break;
 	case 0xBD: // LDA Absolute, X
-		this->lda(this->absolute(this->memory[this->x_reg]));
+		this->LD(this->accum, this->absolute(this->getX()));
 		break;
-	case 0xBE: break;
+	case 0xBE: // LDX Absolute, Y
+		this->LD(this->y_reg, this->absolute(this->getY()));
+		break;
 
 	case 0xC0: break;
 	case 0xC1: break;
@@ -340,7 +370,7 @@ int JoNES::runCore(bool debug=false)
 
 
 // pass mem[x] or mem[y] reg to this
-uint16_t JoNES::absolute(uint8_t val=0)
+uint8_t JoNES::absolute(uint8_t val=0)
 {
 	uint32_t addr = this->memory[this->PC++];
 	addr |= this->memory[this->PC++] << 8;
@@ -349,18 +379,17 @@ uint16_t JoNES::absolute(uint8_t val=0)
 	return (uint16_t)(addr & 0xFFFF);
 }
 // pass mem[x] or mem[y]  to this
-uint16_t JoNES::zero_page(uint8_t val=0)
+uint8_t& JoNES::zero_page(uint8_t val=0)
 {
 	// get addr, increase PC, then add value at addr w/ X val
 	uint16_t addr = this->memory[this->PC++] + val;
-	uint16_t res = this->memory[addr & 0xFF]; // if addr overflows, wrap around
-	return res;
+	return this->memory[addr & 0xFF];
 }
 
-uint16_t JoNES::index_indirect_x()
+uint8_t& JoNES::index_indirect_x()
 {
 	// get addr and add X val to it (ensure wrap around)
-	uint16_t addr = this->memory[this->PC++] + this->memory[this->x_reg];
+	uint16_t addr = this->memory[this->PC++] + this->getX();
 	addr &= 0xFF; // eliminate any carry
 
 	// load LSB
@@ -371,11 +400,11 @@ uint16_t JoNES::index_indirect_x()
 	return this->memory[res];
 }
 
-uint16_t JoNES::indirect_index_y()
+uint8_t& JoNES::indirect_index_y()
 {
 	// get addr, add to Y val
 	uint8_t param = this->memory[this->PC++];
-	uint16_t addr = this->memory[param] + this->memory[this->y_reg];
+	uint16_t addr = this->memory[param] + this->getY();
 	// addr is LSB; MSB will be bit 9 (carry) + 1 + LSB
 	addr |= this->memory[(param + 1) && 0xFF] + (addr >> 8);
 
@@ -384,33 +413,59 @@ uint16_t JoNES::indirect_index_y()
 
 
 // =============== Functions ==============
-int JoNES::adc(uint16_t i)
+int JoNES::ADC(uint8_t val)
 {
-	uint16_t val = i + this->accum;
-	// deal with flags; check for carry
-	//this->status |= (val & 0x80); // set N flag
-	this->flag_N = (val & 0x80) >> 7;
-	if (val > 0xFF)
-		this->flag_C = 1; // set C  flag
-
-	//http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html
-	if ((i ^ val) & (this->accum ^ val) & 0x80)
-		this->flag_V = 1;
-
-	this->accum = (uint8_t)(val & 0xFF); // update A
-
-	if (this->accum == 0)
-		this->flag_Z = 1;
+	uint16_t res = val + this->accum;
+	this->setFlags(res, 0b11100011, val, this->accum);
+	this->accum = (uint8_t)(res & 0xFF); // update A
 
 	return 1; // success
 }
 
-int JoNES::lda(uint8_t val)
+int JoNES::AND(uint8_t val)
 {
-	this->accum = val;
-	this->flag_N = (val & 0x80) >> 7;
-	if (val == 0) this->flag_Z = 1;
+	this->accum &= val;
+	this->setFlags(val, 0b10100010);
+
+	return 1;
+}
+
+int JoNES::ASL(uint8_t &reg)
+{
+	uint16_t res = reg << 1;
+	this->setFlags(res, 0b10100011);
+	reg <<= 1;
+
+	return 1;
+}
+
+int JoNES::LD(uint8_t &reg, uint8_t val)
+{
+	reg = val;
+	this->setFlags(val, 0b10100010);
 
 	return 1; // success
+}
+
+// TODO: NOT CURRENTLY USED; maybe find a way to utilize this later?
+// ========== set status flags ==========
+// NV-BDIZC
+// 76543210
+// http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html
+int JoNES::setFlags(uint16_t out, uint8_t flags, uint16_t M=0, uint16_t N=0)
+{
+	if (flags & 0x01) // carry
+		this->flag_C = (out >> 8);
+	if (flags & 0x02 >> 1) // zero
+		this->flag_Z = (out & 0xFF == 0);
+	if (flags & 0x04 >> 2) // interrupt disable
+		this->flag_I = 1;
+	if (flags & 0x0F >> 4) // break
+		this->flag_B = 1;
+	if (flags & 0x40 >> 6) // overflow
+		this->flag_V = ((M ^ out) & (N ^ out) & 0x80) != 0;
+	if (flags & 0x80 >> 7) // Negative
+		this->flag_N = (out & 0x80) >> 7;
+	return 1;
 }
 

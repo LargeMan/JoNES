@@ -94,13 +94,27 @@ private:
 			return i & 0x2007;
 		return i;
 	}
+
+	uint8_t getX()
+	{
+		return memory[x_reg];
+	}
+	uint8_t getY()
+	{
+		return memory[y_reg];
+	}
 	// addressing methods
-	uint16_t absolute(uint8_t val);
-	uint16_t zero_page(uint8_t val);
-	uint16_t index_indirect_x();
-	uint16_t indirect_index_y();
+	uint8_t absolute(uint8_t val);
+	uint8_t &zero_page(uint8_t val);
+	uint8_t &index_indirect_x();
+	uint8_t &indirect_index_y();
 
 	// function methods
-	int adc(uint16_t i);
-	int lda(uint8_t val);
+	int ADC(uint8_t val);
+	int AND(uint8_t val);
+	int ASL(uint8_t &reg);
+	int LD(uint8_t &reg, uint8_t val);
+
+	// status set
+	int setFlags(uint16_t out, uint8_t flags, uint16_t M, uint16_t N);
 };
