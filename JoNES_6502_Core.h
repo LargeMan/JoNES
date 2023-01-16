@@ -2,6 +2,8 @@
 #include <chrono>
 #include <thread>
 #include <iostream>
+#include <stdio.h>
+
 
 typedef uint8_t reg8;
 typedef uint16_t reg16;
@@ -68,9 +70,15 @@ public:
 
 	int runCore(bool debug = false);
 
-private:
 	// full addr range; 
 	uint8_t memory[65536] = { 0 };
+
+	void printRegs()
+	{
+		printf("Stack: %x\nX: %x\nY: %x\nA: %x\nPC: %x\n",
+			this->stack_ptr, this->x_reg, this->y_reg, this->accum, this->PC);
+	}
+private:
 
 	// registers
 	uint8_t status = 0x34; //011100; 
@@ -78,7 +86,7 @@ private:
 	uint8_t x_reg = 0;
 	uint8_t y_reg = 0;
 	uint8_t accum = 0;
-	uint16_t PC = 0;
+	uint16_t PC = 0xFFFB; // reset vector is FFFC, but opcode func does PC++ first
 
 	// flags
 	int flag_N, flag_V, flag_B, flag_D, flag_I, flag_Z, flag_C;
@@ -104,8 +112,8 @@ private:
 		return memory[y_reg];
 	}
 	// addressing methods
-	uint8_t &absolute(uint8_t val);
-	uint8_t &zero_page(uint8_t val);
+	uint8_t &absolute(uint8_t val=0);
+	uint8_t &zero_page(uint8_t val=0);
 	uint8_t &index_indirect_x();
 	uint8_t &indirect_index_y();
 
@@ -113,8 +121,35 @@ private:
 	int ADC(uint8_t val);
 	int AND(uint8_t val);
 	int ASL(uint8_t &reg);
+	int BR();
+	int BIT(uint8_t val);
+	int CM(uint8_t &reg, uint8_t val);
+	int DE(uint8_t &reg);
+	int EOR(uint8_t val);
+	int IN(uint8_t &reg);
 	int LD(uint8_t &reg, uint8_t val);
+	int LSR(uint8_t &reg);
+	int ORA(uint8_t val);
+	int PLP();
+	int ROL(uint8_t &reg);
+	int ROR(uint8_t &reg);
+	int RTS();
+	int SBC(uint8_t val);
+
 
 	// status set
-	int setFlags(uint16_t out, uint8_t flags, uint16_t M, uint16_t N);
+	int setZN(uint8_t val);
+	int setFlags(uint16_t out, uint8_t flags, uint16_t M=0, uint16_t N=0);
+	uint8_t statusReg()
+	{
+		uint8_t status = 0x20;
+		status |= this->flag_C;
+		status |= this->flag_Z << 1;
+		status |= this->flag_I << 2;
+		status |= this->flag_B << 4;
+		status |= this->flag_V << 6;
+		status |= this->flag_N << 7;
+
+		return status;
+	}
 };
