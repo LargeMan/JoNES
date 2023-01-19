@@ -124,7 +124,7 @@ private:
 	int ADC(uint8_t val);
 	int AND(uint8_t val);
 	int ASL(uint8_t &reg);
-	int BR();
+	int BR(int flag);
 	int BIT(uint8_t val);
 	int CM(uint8_t &reg, uint8_t val);
 	int DE(uint8_t &reg);

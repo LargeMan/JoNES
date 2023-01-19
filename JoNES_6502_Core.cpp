@@ -61,7 +61,7 @@ int JoNES::coreExec(uint8_t opcode)
 
 		uint8_t status = this->statusReg();
 		this->memory[this->stack_ptr - 2] = status;
-
+		this->stack_ptr -= 3;
 		uint16_t new_PC = this->memory[0xFFFE];
 		new_PC |= (uint16_t)(this->memory[0xFFFF]) << 8;
 
@@ -97,7 +97,7 @@ int JoNES::coreExec(uint8_t opcode)
 		break;
 
 	case 0x10: // BPL
-		if (!this->flag_N) this->BR();
+		this->BR(!this->flag_N);
 		break;
 	case 0x11: // ORA (Indirect), Y
 		this->ORA(this->indirect_index_y());
@@ -170,7 +170,7 @@ int JoNES::coreExec(uint8_t opcode)
 		break;
 
 	case 0x30: // BMI
-		if (this->flag_N) this->BR();
+		this->BR(this->flag_N);
 		break;
 	case 0x31: // AND (Indirect), Y
 		this->AND(this->indirect_index_y());
@@ -233,7 +233,7 @@ int JoNES::coreExec(uint8_t opcode)
 		break;
 
 	case 0x50: // BVC
-		if (!this->flag_V) this->BR();
+		this->BR(!this->flag_V);
 		break;
 	case 0x51: // EOR (Indirect), Y
 		this->EOR(this->indirect_index_y());
@@ -276,7 +276,7 @@ int JoNES::coreExec(uint8_t opcode)
 		break;
 	
 	case 0x68: // PLA
-		this->accum = this->memory[this->stack_ptr++];
+		this->accum = this->memory[++this->stack_ptr];
 		this->setZN(this->accum);
 		break;
 	case 0x69: // ADC Immediate
@@ -309,7 +309,7 @@ int JoNES::coreExec(uint8_t opcode)
 		break;
 	
 	case 0x70: // BVS
-		if (this->flag_Z) this->BR();
+		this->BR(this->flag_Z);
 		break;
 	case 0x71: // ADC (Indirect), Y
 		this->ADC(this->indirect_index_y());
@@ -370,7 +370,7 @@ int JoNES::coreExec(uint8_t opcode)
 		break;
 
 	case 0x90: // BCC
-		if (!this->flag_C) this->BR();
+		this->BR(!this->flag_C);
 		break;
 	case 0x91: // STA (Indirect), Y
 		this->LD(this->indirect_index_y(), this->accum);
@@ -444,7 +444,7 @@ int JoNES::coreExec(uint8_t opcode)
 		break;
 
 	case 0xB0: // BCS
-		if (this->flag_C) this->BR();
+		this->BR(this->flag_C);
 		break;
 	case 0xB1: // LDA (Indirect), Y
 		this->LD(this->accum, this->indirect_index_y());
@@ -519,7 +519,7 @@ int JoNES::coreExec(uint8_t opcode)
 		break;
 	
 	case 0xD0: // BNE
-		if (!this->flag_Z) this->BR();
+		this->BR(!this->flag_Z);
 		break;
 	case 0xD1: // CMP (Indirect), Y
 		this->CM(this->accum, this->indirect_index_y());
@@ -584,7 +584,7 @@ int JoNES::coreExec(uint8_t opcode)
 		break;
 	
 	case 0xF0: // BEQ
-		if (this->flag_Z) this->BR();
+		this->BR(this->flag_Z);
 		break;
 	case 0xF1: // SBC (Indirect), Y
 		this->SBC(this->indirect_index_y());
@@ -711,8 +711,14 @@ int JoNES::ASL(uint8_t &reg)
 	return 1;
 }
 
-int JoNES::BR()
+int JoNES::BR(int flag)
 {
+	// branch condition not met
+	if (!flag)
+	{
+		this->PC++;
+		return 1;
+	}
 	uint8_t val = this->memory[this->PC++];
 	// uint to int is implementation defined in C/CPP
 	// this hack is meant to ensure a two's comp subtraction
