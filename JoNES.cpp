@@ -8,6 +8,7 @@
 //using namespace std;
 
 int testing(JoNES* NES, int location, char *arg);
+int runCore(JoNES* NES, bool debug=false);
 
 int main(int argc, char **argv)
 {
@@ -18,10 +19,10 @@ int main(int argc, char **argv)
 	}
 	std::cout << "Initializing" << std::endl;
 
-	JoNES *NES = new JoNES();
-
+	JoNES *NES = new JoNES(argv[1]);
+	runCore(NES);
 	// basic testing
-	testing(NES, 0, argv[1]);
+	//testing(NES, 0, argv[1]);
 
 	delete NES;
 	return 0;
@@ -29,41 +30,46 @@ int main(int argc, char **argv)
 
 int testing(JoNES* NES, int location, char *arg)
 {
+	return 1;
+}
 
-	// load program into memory
-	std::ifstream program(arg, std::ios_base::binary);
+// TODO: move this to JoNES.cpp
+int runCore(JoNES* NES, bool debug)
+{
+	int cycles_per_sec = 1789773; // NTSC hrtz; TODO: have this value set from outside
+	// second to milliseconds
 
-	int j = 0;
-	if (program.is_open())
+	while (1)
 	{
-		char c;
-		while (program.get(c))
+
+		int cycles_todo = cycles_per_sec;
+		int cycles_done = 0;
+
+		auto start = std::chrono::high_resolution_clock::now();
+
+		while (cycles_done < cycles_todo)
 		{
-			//std::cout << std::hex << c;
-			printf("%x ", (uint8_t)c);
-			NES->memory[j] = (uint8_t)c;
-			j++;
+
+			uint8_t opcode = (NES->getOp());
+			NES->coreExec(opcode);
+			cycles_done += cycles6502[opcode];
+			NES->printRegs();
+			if (opcode == 0)
+			{
+				std::cout << "FIN (BRK)" << std::endl;
+				return 0;
+			}
+			//this->PC += bytes6502[opcode]; // do this in coreExec
+
 		}
-		puts("");
+		auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start);
+		// sleep for 1 second - exec time
+		if (debug)
+			std::cout << "Sleeping for: "
+			<< std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::microseconds(1000000) - elapsed).count()
+			<< std::endl;
+
+		std::this_thread::sleep_for(std::chrono::microseconds(1000000) - elapsed);
 	}
-	std::cout << std::endl;
-	// jump to addr on reset vector (should be 0 for now)
-	NES->coreExec(0x6c);
-	int i = 0;
-
-
-	// i think a brk (0x00) instruct should simply "turn off" the cpu functionally
-	// howerver, for now this will just run through the number of bytes
-
-	while (i < j)
-	{
-		printf("OP: %x\n", NES->memory[i]);
-		NES->coreExec(NES->memory[i]);
-		NES->printRegs();
-		i += bytes6502[NES->memory[i]];
-		puts("");
-	}
-
-
 	return 1;
 }

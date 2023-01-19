@@ -1,8 +1,33 @@
 #include "JoNES_6502_Core.h"
 
-JoNES::JoNES()
+JoNES::JoNES(char* arg)
 {
+	std::ifstream program(arg, std::ios_base::binary);
 
+	int i = 0x0600;
+	if (program.is_open())
+	{
+		char c;
+		while (program.get(c))
+		{
+			//std::cout << std::hex << c;
+			printf("%x ", (uint8_t)c);
+			this->memory[i] = (uint8_t)c;
+			i++;
+		}
+		puts("");
+	}
+	std::cout << std::endl;
+
+	// for now, programs will start at 0x0600 for testing purposes
+	// set indirect vector for init jump to 0xFFFE
+	this->memory[0xFFFC] = 0xFE;
+	this->memory[0xFFFD] = 0xFF;
+
+	// set it so mem[FF] mem[FE] points to 0x600
+	this->memory[0xFFFF] = 0x06;
+	// jump to addr on reset vector (should be 0 for now)
+	this->coreExec(0x6c);
 }
 
 JoNES::~JoNES()
@@ -25,6 +50,7 @@ int JoNES::coreReset()
 int JoNES::coreExec(uint8_t opcode)
 {
 	this->PC++;
+	printf("op: %x\n", opcode);
 	switch (opcode)
 	{
 	case 0x00: // BRK
@@ -108,8 +134,7 @@ int JoNES::coreExec(uint8_t opcode)
 		this->memory[this->stack_ptr--] = this->PC >> 8;
 
 		this->PC = target;
-	}
-		break;
+	} break;
 	case 0x21: // AND (Indirect, X)
 		this->AND(this->index_indirect_x());
 		break;
@@ -266,19 +291,15 @@ int JoNES::coreExec(uint8_t opcode)
 	{
 		// there is an error in the original 6502 with this op; it is replicated for accuracy.
 		uint16_t addr = this->memory[this->PC++]; // get lower byte
-		// you would think upper byte is just addr + 1,
-		// but the bug makes it so if addr == xxFF for LSB, MSB comes from xx00 instead
-		if (addr == 0xFF)
-			addr |= this->memory[addr & 0xFF00] << 8;
+		addr |= this->memory[this->PC] << 8;
+
+		uint16_t val = this->memory[addr];
+		if ((addr & 0xFF) == 0xFF)
+			val |= this->memory[addr & 0xFF00] << 8;
 		else
-			addr |= this->memory[addr + 1] << 8;
-		
-		
-		//addr |= this->memory[this->PC++] << 8; // get upper byte
+			val |= this->memory[addr+1] << 8;
 
-
-		this->PC = this->memory[addr];
-
+		this->PC = val;
 	} break;
 	case 0x6D: // ADC absolute
 		this->ADC(this->absolute());
@@ -330,7 +351,7 @@ int JoNES::coreExec(uint8_t opcode)
 		break;
 
 	case 0x88: // DEY
-		this->DE(this->memory[this->y_reg]);
+		this->DE(this->y_reg);
 		break;
 
 	case 0x8A: // TXA
@@ -484,7 +505,7 @@ int JoNES::coreExec(uint8_t opcode)
 		this->CM(this->accum, this->memory[this->PC++]);
 		break;
 	case 0xCA: // DEX
-		this->DE(this->memory[this->x_reg]);
+		this->DE(this->x_reg);
 		break;
 	
 	case 0xCC: // CPY Absolute
@@ -615,39 +636,6 @@ int JoNES::coreStop()
 	return 1;
 }
 
-// TODO: move this to JoNES.cpp
-int JoNES::runCore(bool debug)
-{
-	int cycles_per_sec = 1789773; // NTSC hrtz; TODO: have this value set from outside
-	// second to milliseconds
-
-	while (1)
-	{
-
-		int cycles_todo = cycles_per_sec;
-		int cycles_done = 0;
-
-		auto start = std::chrono::high_resolution_clock::now();
-		while (cycles_done < cycles_todo)
-		{
-
-			uint8_t opcode = (this->memory[this->PC]);
-			this->coreExec(opcode);
-			cycles_done += cycles6502[opcode];
-			//this->PC += bytes6502[opcode]; // do this in coreExec
-
-		}
-		auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start);
-		// sleep for 1 second - exec time
-		if (debug)
-			std::cout << "Sleeping for: "
-			<< std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::microseconds(1000000) - elapsed).count()
-			<< std::endl;
-
-		std::this_thread::sleep_for(std::chrono::microseconds(1000000) - elapsed);
-	}
-	return 1;
-}
 
 // =============== Indexing Modes ==============
 // pass mem[x] or mem[y] reg to this
@@ -656,7 +644,7 @@ uint8_t& JoNES::absolute(uint8_t val)
 	uint32_t addr = this->memory[this->PC++];
 	addr |= this->memory[this->PC++] << 8;
 	addr += val;
-	
+
 	return this->memory[(uint16_t)(addr & 0xFFFF)];
 }
 // pass mem[x] or mem[y]  to this
@@ -664,13 +652,14 @@ uint8_t& JoNES::zero_page(uint8_t val)
 {
 	// get addr, increase PC, then add value at addr w/ X val
 	uint16_t addr = this->memory[this->PC++] + val;
+
 	return this->memory[addr & 0xFF];
 }
 
 uint8_t& JoNES::index_indirect_x()
 {
 	// get addr and add X val to it (ensure wrap around)
-	uint16_t addr = this->memory[this->PC++] + this->getX();
+	uint16_t addr = this->memory[this->PC++] + this->x_reg;
 	addr &= 0xFF; // eliminate any carry
 
 	// load LSB
@@ -685,11 +674,13 @@ uint8_t& JoNES::indirect_index_y()
 {
 	// get addr, add to Y val
 	uint8_t param = this->memory[this->PC++];
-	uint16_t addr = this->memory[param] + this->getY();
-	// addr is LSB; MSB will be bit 9 (carry) + 1 + LSB
-	addr |= this->memory[(param + 1) && 0xFF] + (addr >> 8);
+	uint16_t addr = this->memory[param];
+	addr |= this->memory[(param + 1) & 0xFF] << 8;
 
-	return this->memory[addr];
+	// addr is LSB; MSB will be bit 9 (carry) + 1 + LSB (MAYBE NOT?)
+	//addr |= this->memory[(param + 1) && 0xFF] + (addr >> 8);
+
+	return this->memory[addr + this->y_reg];
 }
 
 
@@ -725,10 +716,10 @@ int JoNES::BR()
 	uint8_t val = this->memory[this->PC++];
 	// uint to int is implementation defined in C/CPP
 	// this hack is meant to ensure a two's comp subtraction
-	if (val < 0x80)
+	if (val < (uint8_t)0x80)
 		this->PC += val;
 	else
-		this->PC -= (~val + 1);
+		this->PC -= (uint8_t)(~val + 1);
 
 	return 1;
 }
@@ -746,9 +737,9 @@ int JoNES::BIT(uint8_t val)
 
 int JoNES::CM(uint8_t &reg, uint8_t val)
 {
-	this->flag_C = (this->accum >= val);
-	this->flag_Z = (this->accum == val);
-	this->flag_N = this->accum >> 7;
+	this->flag_C = (reg >= val);
+	this->flag_Z = (reg == val);
+	this->flag_N = reg >> 7;
 	return 1;
 }
 

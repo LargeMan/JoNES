@@ -2,6 +2,7 @@
 #include <chrono>
 #include <thread>
 #include <iostream>
+#include <fstream>
 #include <stdio.h>
 
 
@@ -51,7 +52,7 @@ static uint8_t cycles6502[256] = {
 class JoNES
 {
 public:
-	JoNES();
+	JoNES(char* arg);
 	~JoNES();
 
 	int coreInit();
@@ -68,18 +69,20 @@ public:
 
 	int coreStop();
 
-	int runCore(bool debug = false);
-
-	// full addr range; 
-	uint8_t memory[65536] = { 0 };
 
 	void printRegs()
 	{
-		printf("Stack: %x\nX: %x\nY: %x\nA: %x\nPC: %x\n",
+		printf("Stack: %x\nX: %x\nY: %x\nA: %x\nPC: %x\n\n",
 			this->stack_ptr, this->x_reg, this->y_reg, this->accum, this->PC);
+	}
+	uint8_t getOp()
+	{
+		return this->memory[this->PC];
 	}
 private:
 
+	// full addr range; 
+	uint8_t memory[65536] = { 0 };
 	// registers
 	uint8_t status = 0x34; //011100; 
 	uint8_t stack_ptr = 0xFD;
