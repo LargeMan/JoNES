@@ -22,7 +22,7 @@ JoNES::JoNES(char* arg)
 	// for now, programs will start at 0x0600 for testing purposes
 	// set indirect vector for init jump to 0x00
 	this->memory[0xFFFC] = 0x00;
-	this->memory[0xFFFD] = 0x01;
+	this->memory[0xFFFD] = 0x00;
 
 	// set it so mem[FF] mem[FE] points to 0x0600
 	this->memory[0x01] = 0x06;
@@ -627,7 +627,7 @@ int JoNES::coreExec(uint8_t opcode)
 	}
 
 	// read somewhere that the 1 byte instructs require a wasted 2nd byte
-	if (opcode != 0 && bytes6502[opcode] == 1) this->PC++;
+	//if (opcode != 0 && bytes6502[opcode] == 1) this->PC++;
 
 	return this->cycles;
 }
