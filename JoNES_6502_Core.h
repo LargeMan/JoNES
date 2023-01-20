@@ -79,6 +79,9 @@ public:
 	{
 		return this->memory[this->PC];
 	}
+
+	void setNMI(int i) { this->i_NMI = 1; }
+	void setIRQ(int i) { this->i_IRQ = 1; }
 private:
 
 	// full addr range; 
@@ -94,6 +97,12 @@ private:
 	// flags
 	int flag_N, flag_V, flag_B, flag_D, flag_I, flag_Z, flag_C;
 
+	// keeps track of cycles in an op
+	// NOTE: its a bit of a hack, but don't feel like refactoring the addr instructs
+	int cycles;
+
+	// interrupts
+	int i_NMI = 0, i_IRQ = 0;
 
 	int indexTrans(int i)
 	{
@@ -106,19 +115,13 @@ private:
 		return i;
 	}
 
-	uint8_t getX()
-	{
-		return memory[x_reg];
-	}
-	uint8_t getY()
-	{
-		return memory[y_reg];
-	}
+	uint8_t getX() { return memory[x_reg]; }
+	uint8_t getY() { return memory[y_reg]; }
 	// addressing methods
-	uint8_t &absolute(uint8_t val=0);
-	uint8_t &zero_page(uint8_t val=0);
-	uint8_t &index_indirect_x();
-	uint8_t &indirect_index_y();
+	uint8_t& absolute(uint8_t val=0);
+	uint8_t& zero_page(uint8_t val=0);
+	uint8_t& index_indirect_x();
+	uint8_t& indirect_index_y();
 
 	// function methods
 	int ADC(uint8_t val);
@@ -155,4 +158,7 @@ private:
 
 		return status;
 	}
+
+	// interrupt handling
+	int interrupt(uint16_t val);
 };

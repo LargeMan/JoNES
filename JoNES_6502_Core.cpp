@@ -20,12 +20,12 @@ JoNES::JoNES(char* arg)
 	std::cout << std::endl;
 
 	// for now, programs will start at 0x0600 for testing purposes
-	// set indirect vector for init jump to 0xFFFE
-	this->memory[0xFFFC] = 0xFE;
-	this->memory[0xFFFD] = 0xFF;
+	// set indirect vector for init jump to 0x00
+	this->memory[0xFFFC] = 0x00;
+	this->memory[0xFFFD] = 0x01;
 
-	// set it so mem[FF] mem[FE] points to 0x600
-	this->memory[0xFFFF] = 0x06;
+	// set it so mem[FF] mem[FE] points to 0x0600
+	this->memory[0x01] = 0x06;
 	// jump to addr on reset vector (should be 0 for now)
 	this->coreExec(0x6c);
 }
@@ -49,23 +49,35 @@ int JoNES::coreReset()
 
 int JoNES::coreExec(uint8_t opcode)
 {
+	// interrupt handling
+	if (this->i_NMI)
+	{
+		//this->flag_I = 0;
+		this->interrupt(0xFFFA);
+		this->i_NMI = 0;
+
+		return 7;
+	}
+	if (this->i_IRQ && this->flag_I)
+	{
+		this->flag_I = 0;
+		this->interrupt(0xFFFE);
+		this->i_IRQ = 0;
+
+		return 7;
+	}
+
+
 	this->PC++;
 	printf("op: %x\n", opcode);
+	this->cycles = cycles6502[opcode];
 	switch (opcode)
 	{
 	case 0x00: // BRK
 	{
-		this->PC++; // actually a two byte op
-		this->memory[this->stack_ptr] = this->PC >> 8;
-		this->memory[this->stack_ptr - 1] = this->PC & 0xFF;
-
-		uint8_t status = this->statusReg();
-		this->memory[this->stack_ptr - 2] = status;
-		this->stack_ptr -= 3;
-		uint16_t new_PC = this->memory[0xFFFE];
-		new_PC |= (uint16_t)(this->memory[0xFFFF]) << 8;
-
-		this->PC = new_PC;
+		this->flag_I = 0;
+		this->flag_B = 1;
+		this->interrupt(0xFFFE);
 	} break;
 
 	case 0x01: // ORA (Indirect, X)
@@ -613,7 +625,11 @@ int JoNES::coreExec(uint8_t opcode)
 
 	default: break;
 	}
-	return 1;
+
+	// read somewhere that the 1 byte instructs require a wasted 2nd byte
+	if (opcode != 0 && bytes6502[opcode] == 1) this->PC++;
+
+	return this->cycles;
 }
 
 int JoNES::getContext()
@@ -641,11 +657,15 @@ int JoNES::coreStop()
 // pass mem[x] or mem[y] reg to this
 uint8_t& JoNES::absolute(uint8_t val)
 {
-	uint32_t addr = this->memory[this->PC++];
-	addr |= this->memory[this->PC++] << 8;
-	addr += val;
+	uint32_t temp = this->memory[this->PC++];
+	temp |= this->memory[this->PC++] << 8;
 
-	return this->memory[(uint16_t)(addr & 0xFFFF)];
+	uint16_t addr = (temp + val) & 0xFFFF;
+	// check if page crossed
+	if ((this->memory[addr] & 0xFF00) != (uint16_t)(temp & 0xFF00))
+		this->cycles += 1;
+
+	return this->memory[addr];
 }
 // pass mem[x] or mem[y]  to this
 uint8_t& JoNES::zero_page(uint8_t val)
@@ -676,11 +696,14 @@ uint8_t& JoNES::indirect_index_y()
 	uint8_t param = this->memory[this->PC++];
 	uint16_t addr = this->memory[param];
 	addr |= this->memory[(param + 1) & 0xFF] << 8;
-
+	addr += this->y_reg;
+	// check if page crossed
+	if ((this->memory[addr] & 0xFF00) != (this->PC & 0xFF00))
+		this->cycles += 1;
 	// addr is LSB; MSB will be bit 9 (carry) + 1 + LSB (MAYBE NOT?)
 	//addr |= this->memory[(param + 1) && 0xFF] + (addr >> 8);
 
-	return this->memory[addr + this->y_reg];
+	return this->memory[addr];
 }
 
 
@@ -719,13 +742,19 @@ int JoNES::BR(int flag)
 		this->PC++;
 		return 1;
 	}
+	this->cycles += 1;
 	uint8_t val = this->memory[this->PC++];
 	// uint to int is implementation defined in C/CPP
 	// this hack is meant to ensure a two's comp subtraction
+	uint8_t old_PC = this->PC;
 	if (val < (uint8_t)0x80)
 		this->PC += val;
 	else
 		this->PC -= (uint8_t)(~val + 1);
+
+	// page cross
+	if ((old_PC & 0xFF00) != (this->PC & 0xFF00))
+		this->cycles += 1;
 
 	return 1;
 }
@@ -880,6 +909,25 @@ int JoNES::setFlags(uint16_t out, uint8_t flags, uint16_t M, uint16_t N)
 		this->flag_V = ((M ^ out) & (N ^ out) & 0x80) != 0;
 	if (flags & 0x80 >> 7) // Negative
 		this->flag_N = (out & 0x80) >> 7;
+	return 1;
+}
+
+int JoNES::interrupt(uint16_t val)
+{
+	this->PC++; // actually a two byte op
+	// push PC to stack
+	this->memory[this->stack_ptr--] = this->PC >> 8;
+	this->memory[this->stack_ptr--] = this->PC & 0xFF;
+
+	// push status to stack
+	uint8_t status = this->statusReg();
+	this->memory[this->stack_ptr--] = status;
+
+	// set PC
+	uint16_t new_PC = this->memory[val];
+	new_PC |= (uint16_t)(this->memory[val + 1]) << 8;
+
+	this->PC = new_PC;
 	return 1;
 }
 

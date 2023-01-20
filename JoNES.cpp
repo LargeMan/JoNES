@@ -38,6 +38,8 @@ int runCore(JoNES* NES, bool debug)
 {
 	int cycles_per_sec = 1789773; // NTSC hrtz; TODO: have this value set from outside
 	// second to milliseconds
+	// namespace alias'
+	namespace chn = std::chrono;
 
 	while (1)
 	{
@@ -45,14 +47,13 @@ int runCore(JoNES* NES, bool debug)
 		int cycles_todo = cycles_per_sec;
 		int cycles_done = 0;
 
-		auto start = std::chrono::high_resolution_clock::now();
+		auto start = chn::high_resolution_clock::now();
 
 		while (cycles_done < cycles_todo)
 		{
 
 			uint8_t opcode = (NES->getOp());
-			NES->coreExec(opcode);
-			cycles_done += cycles6502[opcode];
+			cycles_done += NES->coreExec(opcode);
 			NES->printRegs();
 			if (opcode == 0)
 			{
@@ -62,14 +63,14 @@ int runCore(JoNES* NES, bool debug)
 			//this->PC += bytes6502[opcode]; // do this in coreExec
 
 		}
-		auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start);
+		auto elapsed = chn::duration_cast<chn::microseconds>(chn::high_resolution_clock::now() - start);
 		// sleep for 1 second - exec time
 		if (debug)
 			std::cout << "Sleeping for: "
-			<< std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::microseconds(1000000) - elapsed).count()
+			<< chn::duration_cast<chn::microseconds>(chn::microseconds(1000000) - elapsed).count()
 			<< std::endl;
 
-		std::this_thread::sleep_for(std::chrono::microseconds(1000000) - elapsed);
+		std::this_thread::sleep_for(chn::microseconds(1000000) - elapsed);
 	}
 	return 1;
 }
